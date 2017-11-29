@@ -5,6 +5,7 @@ from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 
 import math
+import numpy as np
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
@@ -26,27 +27,51 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 class WaypointUpdater(object):
     def __init__(self):
+
+	rospy.logwarn("Inside Waypoint Updater")
+
         rospy.init_node('waypoint_updater')
+
+	self.pose = None
+        self.base_waypoints = None
+        self.final_waypoints = []
+        #self.traffic_waypoint = None
+        #self.obstacle_waypoint = None
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+	# rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+	# rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
-
-        self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
+        self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=LOOKAHEAD_WPS)
 
         # TODO: Add other member variables you need below
 
         rospy.spin()
 
     def pose_cb(self, msg):
-        # TODO: Implement
-        pass
+	rospy.logwarn("Update pos")
+        self.pose = msg
 
     def waypoints_cb(self, waypoints):
-        # TODO: Implement
-        pass
+        self.base_waypoints = waypoints
+	n=np.shape(waypoints.waypoints)[0]
+	rospy.logwarn("Total waypoints: {}".format(n))
+	
+	for i in range(LOOKAHEAD_WPS):
+		waypoint=waypoints.waypoints[i]
+		rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
+		self.final_waypoints.append(waypoint)
+
+	rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
+
+	#Publishing the Lane with final enpoints after taking first 200
+	lane=Lane()
+	lane.header=self.base_waypoints.header
+	lane.waypoints=np.asarray(self.final_waypoints)
+	self.final_waypoints_pub.publish(lane)
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
