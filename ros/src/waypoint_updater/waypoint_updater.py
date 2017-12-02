@@ -52,15 +52,17 @@ class WaypointUpdater(object):
         rospy.spin()
 
     def pose_cb(self, msg):
-	rospy.logwarn("Update pos")
+	#rospy.logwarn("Update pos")
         self.pose = msg
 
     def waypoints_cb(self, waypoints):
         self.base_waypoints = waypoints
-	n=np.shape(waypoints.waypoints)[0]
-	rospy.logwarn("Total waypoints: {}".format(n))
+	total_waypoints=np.shape(waypoints.waypoints)[0]
+	rospy.logwarn("Total waypoints: {}".format(total_waypoints))
 	
-	for i in range(LOOKAHEAD_WPS):
+	# If total number of waypoints is less than
+	# LOOKAHEAD_WPS, send all waypoints
+	for i in range(min(total_waypoints, LOOKAHEAD_WPS)):
 		waypoint=waypoints.waypoints[i]
 		rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
 		self.final_waypoints.append(waypoint)
