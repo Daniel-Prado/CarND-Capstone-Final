@@ -47,16 +47,16 @@ class DBWNode(object):
         max_lat_accel = rospy.get_param('~max_lat_accel', 3.)
         max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
 
-        self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
+	self.current_velocity = 0
+	self.twist_cmd = None
+	self.dbw_enabled = False
+
+	self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
                                          SteeringCmd, queue_size=100)
         self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd',
                                             ThrottleCmd, queue_size=100)
         self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',
                                          BrakeCmd, queue_size=100)
-
-	self.current_velocity = 0
-	self.twist_cmd = None
-	self.dbw_enabled = False
 
         # TODO: Create `Controller` object. Add Arguments after implemented
         self.controller = Controller(vehicle_mass, accel_limit, wheel_radius, fuel_capacity,
@@ -89,30 +89,13 @@ class DBWNode(object):
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
             # You should only publish the control commands if dbw is enabled
             if self.dbw_enabled:
+	        rospy.logwarn("Publishing from DBWNode:")
                 throttle, brake, steering = self.controller.control(self.current_velocity, self.twist_cmd)
-
-		throttle_data = ThrottleCmd()
-		brake_data = BrakeCmd()
-		steering_data = SteeringCmd()
-
-		#TODO populate data; use 'rosmsg info ThrottleCmd' to see msg info
-		throttle_data.pedal_cmd = throttle
-		throttle_data.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
-		throttle_data.enable = True
-
-		brake_data.pedal_cmd = brake
-		brake_data.pedal_cmd_type = BrakeCmd.CMD_TORQUE
-		brake_data.enable = True
-
-		steering_data.steering_wheel_angle_cmd = steering
-		steering_data.enable = True
 
 	        rospy.logwarn("---throttle:  {}".format(throttle))
 	        rospy.logwarn("---brake:  {}".format(brake))
 	        rospy.logwarn("---steering:  {}".format(steering))
-                self.steer_pub.publish(steering_data)
-                self.throttle_pub.publish(throttle_data)
-                self.brake_pub.publish(brake_data)
+                self.publish(throttle, brake, steering)
             rate.sleep()
 
     def publish(self, throttle, brake, steer):

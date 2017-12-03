@@ -50,7 +50,6 @@ class Controller(object):
 
         # Calculate brake
         # Brake values should be in units of torque (N*m)
-        # TODO: check if accel_limit is the right param to pass
         #https://discussions.udacity.com/t/what-is-the-range-for-the-brake-in-the-dbw-node/412339
         brake = (self.vehicle_mass + self.fuel_capacity * GAS_DENSITY_KG_CUB_M) * throttle * self.wheel_radius
         
@@ -63,7 +62,7 @@ class Controller(object):
         steer = self.yaw_controller.get_steering(linear_velocity, angular_velocity, current_vel)
         
 
-        rospy.logwarn(">>>error:  {}".format(error))
-        rospy.logwarn(">>>time:  {}".format(elapsed_time))
-        rospy.logwarn(">>>other_throttle:  {}".format(other_throttle))
+        #rospy.logwarn(">>>error:  {}".format(error))
+        #rospy.logwarn(">>>time:  {}".format(elapsed_time))
+        #rospy.logwarn(">>>other_throttle:  {}".format(other_throttle))
         return throttle, brake, steer

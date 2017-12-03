@@ -32,13 +32,13 @@ class WaypointUpdater(object):
 
         rospy.init_node('waypoint_updater')
 
-	self.pose = None
+	self.current_pose = None
         self.base_waypoints = None
         self.final_waypoints = []
         #self.traffic_waypoint = None
         #self.obstacle_waypoint = None
 
-        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        rospy.Subscriber('/current_pose', PoseStamped, self.current_pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
@@ -51,9 +51,9 @@ class WaypointUpdater(object):
 
         rospy.spin()
 
-    def pose_cb(self, msg):
-	#rospy.logwarn("Update pos")
-        self.pose = msg
+    def current_pose_cb(self, msg):
+	#rospy.logwarn("Update current_pose")
+        self.current_pose = msg
 
     def waypoints_cb(self, waypoints):
         self.base_waypoints = waypoints
