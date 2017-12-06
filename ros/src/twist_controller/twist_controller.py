@@ -36,9 +36,9 @@ class Controller(object):
         if self.previous_time is None:
             self.previous_time =  time.time() 
 
-        linear_velocity = fabs(twist_cmd.twist.linear.x)
-        angular_velocity = fabs(twist_cmd.twist.angular.z)
-        current_vel = fabs(current_velocity.twist.linear.x)
+        linear_velocity = twist_cmd.twist.linear.x
+        angular_velocity = twist_cmd.twist.angular.z
+        current_vel = current_velocity.twist.linear.x
         error = linear_velocity - current_vel
 
         # Calculate throttle using PID
@@ -61,7 +61,6 @@ class Controller(object):
         #https://discussions.udacity.com/t/no-able-to-keep-the-lane-with-yaw-controller/433887/5
         steer = self.yaw_controller.get_steering(linear_velocity, angular_velocity, current_vel)
         
-
         #rospy.logwarn(">>>error:  {}".format(error))
         #rospy.logwarn(">>>time:  {}".format(elapsed_time))
         #rospy.logwarn(">>>other_throttle:  {}".format(other_throttle))
