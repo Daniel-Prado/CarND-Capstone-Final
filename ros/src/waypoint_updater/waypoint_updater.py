@@ -3,6 +3,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+from scipy.spatial import distance
 
 import math
 import numpy as np
@@ -22,7 +23,7 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 40 # Number of waypoints we will publish. You can change this number
 
 
 class WaypointUpdater(object):
@@ -37,6 +38,7 @@ class WaypointUpdater(object):
         self.final_waypoints = []
         #self.traffic_waypoint = None
         #self.obstacle_waypoint = None
+	self.total_waypoints = 0
 
         rospy.Subscriber('/current_pose', PoseStamped, self.current_pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -48,8 +50,7 @@ class WaypointUpdater(object):
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=LOOKAHEAD_WPS)
 
         # TODO: Add other member variables you need below
-
-        rospy.spin()
+        self.loop()
 
     def current_pose_cb(self, msg):
 	#rospy.logwarn("Update current_pose")
@@ -57,23 +58,8 @@ class WaypointUpdater(object):
 
     def waypoints_cb(self, waypoints):
         self.base_waypoints = waypoints
-	total_waypoints=np.shape(waypoints.waypoints)[0]
-	rospy.logwarn("Total waypoints: {}".format(total_waypoints))
-	
-	# If total number of waypoints is less than
-	# LOOKAHEAD_WPS, send all waypoints
-	for i in range(min(total_waypoints, LOOKAHEAD_WPS)):
-		waypoint=waypoints.waypoints[i]
-		rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
-		self.final_waypoints.append(waypoint)
-
-	rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
-
-	#Publishing the Lane with final enpoints after taking first 200
-	lane=Lane()
-	lane.header=self.base_waypoints.header
-	lane.waypoints=np.asarray(self.final_waypoints)
-	self.final_waypoints_pub.publish(lane)
+	self.total_waypoints=np.shape(waypoints.waypoints)[0]
+	rospy.logwarn("Total waypoints: {}".format(self.total_waypoints))
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
@@ -83,13 +69,39 @@ class WaypointUpdater(object):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
 
+    def loop(self):
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown():
+            if self.current_pose is not None and self.base_waypoints is not None:
+	        rospy.logwarn("Publishing from Waypoints Updater:")
+		
+		closest_point = self.find_closest_waypoint()
+        	rospy.logwarn("CLOSEST POINT {}".format(closest_point))
+
+		self.final_waypoints = [] #Reinitialize each time
+		for i in range(closest_point, closest_point+LOOKAHEAD_WPS):
+		    waypoint=self.base_waypoints.waypoints[i]
+		    rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
+		    self.final_waypoints.append(waypoint)
+		rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
+                self.publish()
+
+            rate.sleep()
+
+    def publish(self):
+        #Publishing the Lane with final enpoints
+	lane=Lane()
+	lane.header=self.base_waypoints.header
+	lane.waypoints=np.asarray(self.final_waypoints)
+	self.final_waypoints_pub.publish(lane)
+
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
 
     def set_waypoint_velocity(self, waypoints, waypoint, velocity):
         waypoints[waypoint].twist.twist.linear.x = velocity
 
-    def distance(self, waypoints, wp1, wp2):
+    def distance_between_waypoints(self, waypoints, wp1, wp2):
         dist = 0
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
         for i in range(wp1, wp2+1):
@@ -97,6 +109,20 @@ class WaypointUpdater(object):
             wp1 = i
         return dist
 
+    def find_closest_waypoint(self):
+	# Find one waypoint closest to current position of the car
+	closest_point = 0
+	closest_dist_so_far = 100000 #replace with highest float
+	current_w_pos = self.current_pose.pose.position
+	for i in range(self.total_waypoints):
+	    another_w_pos=self.base_waypoints.waypoints[i].pose.pose.position
+	    a = (current_w_pos.x, current_w_pos.y, current_w_pos.z)
+	    b = (another_w_pos.x, another_w_pos.y, another_w_pos.z)
+	    distance_between_wps = distance.euclidean(a, b)
+	    if(distance_between_wps<closest_dist_so_far):
+		closest_dist_so_far=distance_between_wps
+		closest_point = i
+	return closest_point
 
 if __name__ == '__main__':
     try:
