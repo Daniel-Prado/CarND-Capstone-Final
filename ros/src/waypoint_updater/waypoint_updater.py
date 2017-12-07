@@ -111,7 +111,7 @@ class WaypointUpdater(object):
             wp_search_list = list(range(0, self.total_waypoints))
         else:
             min_point = self.last_closest_point #assumes only forward movement
-            max_point = (self.last_closest_point + 10) % self.total_waypoints
+            max_point = (self.last_closest_point + 20) % self.total_waypoints
             if max_point > min_point:
                 wp_search_list = list(range(min_point,max_point))
             else:
