@@ -10,6 +10,9 @@ from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import yaml
+#TODO remove imports after data is collected
+import time
+import csv
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -49,7 +52,38 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
 
-        rospy.spin()
+        #rospy.spin()
+        self.loop()
+
+
+    def loop(self):
+        rate = rospy.Rate(1000)
+        while not rospy.is_shutdown():
+            # TODO: This is to collect data only; remove later
+            if self.camera_image is not None and len(self.lights)>0:
+                rospy.logwarn("IMAGEEEE:")
+                image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+                image_name = "../../sdc-data/image"+str(time.time())+".jpeg"
+                cv2.imwrite(image_name, image)
+	        
+	        for light in self.lights:
+                    data = (image_name,
+                            light.pose.pose.position.x, 
+                            light.pose.pose.position.y,
+                            light.pose.pose.position.z,
+                            light.pose.pose.orientation.x,
+                            light.pose.pose.orientation.y,
+                            light.pose.pose.orientation.z,
+                            light.pose.pose.orientation.w)
+                    with open('../../sdc-data/image-data.csv', 'a+') as myfile:
+                        wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+                        wr.writerow(data)
+                
+                rospy.logwarn("WRITTENNNN")
+            rate.sleep()
+        
+        
+        
 
     def pose_cb(self, msg):
         self.pose = msg
