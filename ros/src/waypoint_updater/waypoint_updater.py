@@ -54,17 +54,17 @@ class WaypointUpdater(object):
     def current_pose_cb(self, msg):
         self.current_pose = msg
         if self.base_waypoints is not None:
-            rospy.logwarn("Publishing from Waypoints Updater:")
+            #rospy.logwarn("Publishing from Waypoints Updater:")
     
             closest_point = self.find_closest_waypoint()
-            rospy.logwarn("CLOSEST POINT {}".format(closest_point))
+            #rospy.logwarn("CLOSEST POINT {}".format(closest_point))
 
             self.final_waypoints = [] #Reinitialize each time
             for i in range(closest_point, closest_point+LOOKAHEAD_WPS):
                 waypoint=self.base_waypoints.waypoints[i]
-                rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
+                #rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
                 self.final_waypoints.append(waypoint)
-            rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
+            #rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
             self.publish()
 
     def waypoints_cb(self, waypoints):
