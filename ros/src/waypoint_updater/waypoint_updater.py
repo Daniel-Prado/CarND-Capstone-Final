@@ -38,6 +38,7 @@ class WaypointUpdater(object):
         #self.traffic_waypoint = None
         #self.obstacle_waypoint = None
         self.total_waypoints = 0
+        self.last_closest_point = None
         
         rospy.Subscriber('/current_pose', PoseStamped, self.current_pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -106,7 +107,18 @@ class WaypointUpdater(object):
         closest_point = 0
         closest_dist_so_far = 100000 #replace with highest float
         current_w_pos = self.current_pose.pose.position
-        for i in range(self.total_waypoints):
+        if self.last_closest_point is None:
+            wp_search_list = list(range(0, self.total_waypoints))
+        else:
+            min_point = self.last_closest_point #assumes only forward movement
+            max_point = (self.last_closest_point + 10) % self.total_waypoints
+            if max_point > min_point:
+                wp_search_list = list(range(min_point,max_point))
+            else:
+                wp_search_list = list(range(min_point, self.total_waypoints))
+                wp_search_list.append(list(range(0,max_point)))
+
+        for i in wp_search_list:
             another_w_pos=self.base_waypoints.waypoints[i].pose.pose.position
             a = (current_w_pos.x, current_w_pos.y, current_w_pos.z)
             b = (another_w_pos.x, another_w_pos.y, another_w_pos.z)
@@ -114,6 +126,7 @@ class WaypointUpdater(object):
             if(distance_between_wps<closest_dist_so_far):
                 closest_dist_so_far=distance_between_wps
                 closest_point = i
+        self.last_closest_point = closest_point
         return closest_point
 
 if __name__ == '__main__':
