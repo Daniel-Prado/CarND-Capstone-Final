@@ -7,6 +7,7 @@ from styx_msgs.msg import Lane
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from light_classification.tl_classifier import TLClassifier
+from scipy.spatial import distance
 import tf
 import cv2
 import yaml
@@ -21,6 +22,7 @@ class TLDetector(object):
         self.waypoints = None
         self.camera_image = None
         self.lights = []
+	self.last_closest_point = None
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -56,9 +58,10 @@ class TLDetector(object):
 
     def waypoints_cb(self, waypoints):
         self.waypoints = waypoints
+	self.total_waypoints = len(waypoints.waypoints)
 
     def traffic_cb(self, msg):
-        self.lights = msg.lights
+	self.lights = msg.lights
 
     def image_cb(self, msg):
         """Identifies red lights in the incoming camera image and publishes the index
@@ -100,8 +103,35 @@ class TLDetector(object):
             int: index of the closest waypoint in self.waypoints
 
         """
-        #TODO implement
-        return 0
+	if self.waypoints is None:
+		return 0
+	car_x = pose.position.x
+	car_y = pose.position.y
+	car_xy = (car_x, car_y)
+        closest_point = 0
+        closest_dist_so_far = 100000 #replace with highest float
+
+        if self.last_closest_point is None:
+            wp_search_list = list(range(0, self.total_waypoints))
+        else:
+            min_point = self.last_closest_point #assumes only forward movement
+            max_point = (self.last_closest_point + 20) % self.total_waypoints
+            if max_point > min_point:
+                wp_search_list = list(range(min_point,max_point))
+            else:
+                wp_search_list = list(range(min_point, self.total_waypoints))
+                wp_search_list.append(list(range(0,max_point)))
+
+        for i in wp_search_list:
+            another_w_pos = self.waypoints.waypoints[i].pose.pose.position
+            sample_xy = (another_w_pos.x, another_w_pos.y)
+            distance_between_wps = distance.euclidean(car_xy, sample_xy)
+            if(distance_between_wps < closest_dist_so_far):
+                closest_dist_so_far = distance_between_wps
+                closest_point = i
+        self.last_closest_point = closest_point
+	rospy.loginfo('closest point %s', closest_point)
+        return closest_point
 
     def get_light_state(self, light):
         """Determines the current color of the traffic light
