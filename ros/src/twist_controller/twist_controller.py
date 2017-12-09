@@ -11,7 +11,7 @@ GAS_DENSITY_KG_CUB_M = 755.00373
 ONE_MPH = 0.44704
 
 class Controller(object):
-    def __init__(self, vehicle_mass, accel_limit, wheel_radius, fuel_capacity,
+    def __init__(self, vehicle_mass, accel_limit, decel_limit, wheel_radius, fuel_capacity,
             wheel_base, steer_ratio, max_lat_accel, max_steer_angle,
             tau, ts,
             kp, ki, kd):
@@ -19,6 +19,7 @@ class Controller(object):
         # Initialize controller attributes
         self.vehicle_mass = vehicle_mass
         self.accel_limit = accel_limit
+        self.decel_limit = decel_limit
         self.wheel_radius = wheel_radius
         self.fuel_capacity = fuel_capacity
 
@@ -45,23 +46,27 @@ class Controller(object):
         # Throttle values should be in the range 0 to 1
         elapsed_time = time.time() - self.previous_time
         self.previous_time = time.time()
-        other_throttle = self.pid.step(error, elapsed_time)
-        throttle = min(self.accel_limit, other_throttle)
+        throttle = self.pid.step(error, elapsed_time)
+        throttle = min(self.accel_limit, throttle)
         
         # Calculate brake
         # Brake values should be in units of torque (N*m)
         #https://discussions.udacity.com/t/what-is-the-range-for-the-brake-in-the-dbw-node/412339
         brake = (self.vehicle_mass + self.fuel_capacity * GAS_DENSITY_KG_CUB_M) * throttle * self.wheel_radius
-        
         brake = self.low_pass_filter.filt(brake)
-        #TODO: use decel_limit, accel_limit
+        brake = max(self.decel_limit, brake)
+        
+        # The param contains speed limit in kmph
+        # Let's keep it 3 km below speed limit to prevent speed violations
+        speed_limit = ((rospy.get_param('/waypoint_loader/velocity') - 3)
+                        * 1000.) / (60. * 60.)
+        if current_vel >= speed_limit:
+            throttle = 0.0
+            brake = 0.0
         
         # Calculate steer
         #Good explanation on what to pass to get_steer function in forum:
         #https://discussions.udacity.com/t/no-able-to-keep-the-lane-with-yaw-controller/433887/5
         steer = self.yaw_controller.get_steering(linear_velocity, angular_velocity, current_vel)
         
-        #rospy.logwarn(">>>error:  {}".format(error))
-        #rospy.logwarn(">>>time:  {}".format(elapsed_time))
-        #rospy.logwarn(">>>other_throttle:  {}".format(other_throttle))
         return throttle, brake, steer
