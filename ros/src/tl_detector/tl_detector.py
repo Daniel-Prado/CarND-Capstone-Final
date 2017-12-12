@@ -10,13 +10,24 @@ from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import yaml
-#TODO remove imports after data is collected
+# TODO remove imports after data is collected
 import time
 import csv
+import math
 
 STATE_COUNT_THRESHOLD = 3
 
+
+def pose_distance(pose1, pose2):
+    return math.sqrt((pose1.position.x - pose2.position.x)**2 + (pose1.position.y - pose2.position.y)**2)
+
+
+def pose_angle(pose1, pose2):
+    return math.atan2(pose2.position.y - pose1.position.y, pose2.position.x - pose1.position.x)
+
+
 class TLDetector(object):
+
     def __init__(self):
         rospy.init_node('tl_detector')
 
@@ -40,7 +51,7 @@ class TLDetector(object):
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
-
+        rospy.logwarn("config %s", self.config)
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
@@ -52,38 +63,48 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
 
-        #rospy.spin()
+        # rospy.spin()
         self.loop()
 
-
     def loop(self):
-        rate = rospy.Rate(1000)
+        rate = rospy.Rate(1)
+        myfile = open('../../sdc-data/image-data.csv', 'a+')
+        wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
         while not rospy.is_shutdown():
             # TODO: This is to collect data only; remove later
-            if self.camera_image is not None and len(self.lights)>0:
-                rospy.logwarn("IMAGEEEE:")
-                image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-                image_name = "../../sdc-data/image"+str(time.time())+".jpeg"
-                cv2.imwrite(image_name, image)
-	        
-	        for light in self.lights:
-                    data = (image_name,
-                            light.pose.pose.position.x, 
-                            light.pose.pose.position.y,
-                            light.pose.pose.position.z,
-                            light.pose.pose.orientation.x,
-                            light.pose.pose.orientation.y,
-                            light.pose.pose.orientation.z,
-                            light.pose.pose.orientation.w)
-                    with open('../../sdc-data/image-data.csv', 'a+') as myfile:
-                        wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
-                        wr.writerow(data)
-                
-                rospy.logwarn("WRITTENNNN")
+            if self.camera_image is None or not self.lights or not self.pose:
+                continue
+
+            image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+            image_name = "../../sdc-data/image" + str(time.time()) + ".jpeg"
+            cv2.imwrite(image_name, image)
+
+            data = (image_name, self.gt_image_status())
+            wr.writerow(data)
+
             rate.sleep()
-        
-        
-        
+
+    def gt_image_status(self):
+        # rospy.logwarn("location %s", self.pose)
+        can_see_light = []
+        for light in self.lights:
+            if self.can_i_see_this_light(light):
+                can_see_light.append(light.state)
+
+        assert len(can_see_light) < 2
+        if not can_see_light:
+            return TrafficLight.UNKNOWN
+        return can_see_light[0]
+
+    def can_i_see_this_light(self, light):
+        # distance=[]
+        # for light in self.lights:
+        distance = pose_distance(self.pose.pose, light.pose.pose)
+        if distance > 100 or distance < 10:
+            return False
+        theta_light_car = pose_angle(self.pose.pose, light.pose.pose)
+        if abs(theta_light_car - self.pose.pose.orientation.z) < 0.3:
+            return True
 
     def pose_cb(self, msg):
         self.pose = msg
@@ -92,6 +113,7 @@ class TLDetector(object):
         self.waypoints = waypoints
 
     def traffic_cb(self, msg):
+        # rospy.logwarn("traffic %s", len(msg.lights))
         self.lights = msg.lights
 
     def image_cb(self, msg):
@@ -134,7 +156,7 @@ class TLDetector(object):
             int: index of the closest waypoint in self.waypoints
 
         """
-        #TODO implement
+        # TODO implement
         return 0
 
     def get_light_state(self, light):
@@ -153,7 +175,7 @@ class TLDetector(object):
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        #Get classification
+        # Get classification
         return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
@@ -172,7 +194,7 @@ class TLDetector(object):
         if(self.pose):
             car_position = self.get_closest_waypoint(self.pose.pose)
 
-        #TODO find the closest visible traffic light (if one exists)
+        # TODO find the closest visible traffic light (if one exists)
 
         if light:
             state = self.get_light_state(light)
