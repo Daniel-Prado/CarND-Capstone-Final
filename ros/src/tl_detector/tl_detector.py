@@ -76,11 +76,11 @@ class TLDetector(object):
                 continue
 
             image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-            image_name = "../../sdc-data/image" + str(time.time()) + ".jpeg"
+            image_name = "../../sdc-data/image%s-%s.jpg" % (str(time.time()), self.gt_image_status())
             cv2.imwrite(image_name, image)
 
-            data = (image_name, self.gt_image_status())
-            wr.writerow(data)
+            # data = (image_name, self.gt_image_status())
+            # wr.writerow(data)
 
             rate.sleep()
 
@@ -100,7 +100,7 @@ class TLDetector(object):
         # distance=[]
         # for light in self.lights:
         distance = pose_distance(self.pose.pose, light.pose.pose)
-        if distance > 100 or distance < 10:
+        if distance > 250 or distance < 15:
             return False
         theta_light_car = pose_angle(self.pose.pose, light.pose.pose)
         if abs(theta_light_car - self.pose.pose.orientation.z) < 0.3:
