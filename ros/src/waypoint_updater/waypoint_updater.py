@@ -38,6 +38,7 @@ class WaypointUpdater(object):
         #self.traffic_waypoint = None
         #self.obstacle_waypoint = None
         self.total_waypoints = 0
+        self.last_closest_point = None
 
         rospy.Subscriber('/current_pose', PoseStamped, self.current_pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -49,10 +50,24 @@ class WaypointUpdater(object):
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=LOOKAHEAD_WPS)
 
         # TODO: Add other member variables you need below
-        self.loop()
+        rospy.spin()
 
     def current_pose_cb(self, msg):
         self.current_pose = msg
+        if self.base_waypoints is not None:
+            # rospy.logwarn("Publishing from Waypoints Updater:")
+
+            closest_point = self.find_closest_waypoint()
+            # rospy.logwarn("CLOSEST POINT {}".format(closest_point))
+
+            self.final_waypoints = [] #Reinitialize each time
+            for i in range(closest_point, closest_point+LOOKAHEAD_WPS):
+                if i >= self.total_waypoints:
+                    i = i - self.total_waypoints
+                waypoint=self.base_waypoints.waypoints[i]
+                self.final_waypoints.append(waypoint)
+            #rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
+            self.publish()
 
     def waypoints_cb(self, waypoints):
         self.base_waypoints = waypoints
@@ -66,24 +81,6 @@ class WaypointUpdater(object):
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
-
-    def loop(self):
-        rate = rospy.Rate(50)
-        while not rospy.is_shutdown():
-            if self.current_pose is not None and self.base_waypoints is not None:
-                # rospy.logwarn("Publishing from Waypoints Updater:")
-
-                closest_point = self.find_closest_waypoint()
-                # rospy.logwarn("CLOSEST POINT {}".format(closest_point))
-
-                self.final_waypoints = [] #Reinitialize each time
-                for i in range(closest_point, closest_point+LOOKAHEAD_WPS):
-                    waypoint=self.base_waypoints.waypoints[i]
-                    # rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
-                    self.final_waypoints.append(waypoint)
-                # rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
-                self.publish()
-            rate.sleep()
 
     def publish(self):
         #Publishing the Lane with final enpoints
@@ -111,7 +108,18 @@ class WaypointUpdater(object):
         closest_point = 0
         closest_dist_so_far = 100000 #replace with highest float
         current_w_pos = self.current_pose.pose.position
-        for i in range(self.total_waypoints):
+        if self.last_closest_point is None:
+            wp_search_list = list(range(0, self.total_waypoints))
+        else:
+            min_point = self.last_closest_point #assumes only forward movement
+            max_point = (self.last_closest_point + 20) % self.total_waypoints
+            if max_point > min_point:
+                wp_search_list = list(range(min_point,max_point))
+            else:
+                wp_search_list = list(range(min_point, self.total_waypoints))
+                #wp_search_list.append(list(range(0,max_point)))
+
+        for i in wp_search_list:
             another_w_pos=self.base_waypoints.waypoints[i].pose.pose.position
             a = (current_w_pos.x, current_w_pos.y, current_w_pos.z)
             b = (another_w_pos.x, another_w_pos.y, another_w_pos.z)
@@ -119,6 +127,7 @@ class WaypointUpdater(object):
             if(distance_between_wps<closest_dist_so_far):
                 closest_dist_so_far=distance_between_wps
                 closest_point = i
+        self.last_closest_point = closest_point
         return closest_point
 
 if __name__ == '__main__':
