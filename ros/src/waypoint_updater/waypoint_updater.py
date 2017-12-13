@@ -29,25 +29,25 @@ LOOKAHEAD_WPS = 40 # Number of waypoints we will publish. You can change this nu
 class WaypointUpdater(object):
     def __init__(self):
         rospy.logwarn("Inside Waypoint Updater")
-        
+
         rospy.init_node('waypoint_updater')
-        
+
         self.current_pose = None
         self.base_waypoints = None
         self.final_waypoints = []
         #self.traffic_waypoint = None
         #self.obstacle_waypoint = None
         self.total_waypoints = 0
-        
+
         rospy.Subscriber('/current_pose', PoseStamped, self.current_pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-        
+
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         # rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         # rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
-        
+
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=LOOKAHEAD_WPS)
-        
+
         # TODO: Add other member variables you need below
         self.loop()
 
@@ -71,17 +71,17 @@ class WaypointUpdater(object):
         rate = rospy.Rate(50)
         while not rospy.is_shutdown():
             if self.current_pose is not None and self.base_waypoints is not None:
-                rospy.logwarn("Publishing from Waypoints Updater:")
-                
+                # rospy.logwarn("Publishing from Waypoints Updater:")
+
                 closest_point = self.find_closest_waypoint()
-                rospy.logwarn("CLOSEST POINT {}".format(closest_point))
-                
+                # rospy.logwarn("CLOSEST POINT {}".format(closest_point))
+
                 self.final_waypoints = [] #Reinitialize each time
                 for i in range(closest_point, closest_point+LOOKAHEAD_WPS):
                     waypoint=self.base_waypoints.waypoints[i]
-                    rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
+                    # rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
                     self.final_waypoints.append(waypoint)
-                rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
+                # rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
                 self.publish()
             rate.sleep()
 

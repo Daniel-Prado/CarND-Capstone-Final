@@ -35,7 +35,7 @@ class DBWNode(object):
     def __init__(self):
         rospy.logwarn("Inside DBW Node")
         rospy.init_node('dbw_node')
-        
+
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
         brake_deadband = rospy.get_param('~brake_deadband', .1)
@@ -46,29 +46,29 @@ class DBWNode(object):
         steer_ratio = rospy.get_param('~steer_ratio', 14.8)
         max_lat_accel = rospy.get_param('~max_lat_accel', 3.)
         max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
-        
+
         self.current_velocity = 0
         self.twist_cmd = None
         self.dbw_enabled = False
-        
+
         self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
                                          SteeringCmd, queue_size=100)
         self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd',
                                             ThrottleCmd, queue_size=100)
         self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',
                                          BrakeCmd, queue_size=100)
-        
+
         # TODO: Create `Controller` object. Add Arguments after implemented
         self.controller = Controller(vehicle_mass, accel_limit, wheel_radius, fuel_capacity,
             wheel_base, steer_ratio, max_lat_accel, max_steer_angle,
             tau=0.5, ts=0.02, #average ts observed in Controller
             kp=0.2, ki=0.0005, kd=10.5) #using PID values from my PID project
-        
+
         # TODO: Subscribe to all the topics you need to
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
-        
+
         self.loop()
 
     def current_velocity_cb(self, current_velocity):
@@ -89,12 +89,12 @@ class DBWNode(object):
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
             # You should only publish the control commands if dbw is enabled
             if self.dbw_enabled:
-                rospy.logwarn("Publishing from DBWNode:")
+                # rospy.logwarn("Publishing from DBWNode:")
                 throttle, brake, steering = self.controller.control(self.current_velocity, self.twist_cmd)
-                
-                rospy.logwarn("---throttle:  {}".format(throttle))
-                rospy.logwarn("---brake:  {}".format(brake))
-                rospy.logwarn("---steering:  {}".format(steering))
+
+                # rospy.logwarn("---throttle:  {}".format(throttle))
+                # rospy.logwarn("---brake:  {}".format(brake))
+                # rospy.logwarn("---steering:  {}".format(steering))
                 self.publish(throttle, brake, steering)
             rate.sleep()
 
@@ -104,12 +104,12 @@ class DBWNode(object):
         tcmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
         tcmd.pedal_cmd = throttle
         self.throttle_pub.publish(tcmd)
-        
+
         scmd = SteeringCmd()
         scmd.enable = True
         scmd.steering_wheel_angle_cmd = steer
         self.steer_pub.publish(scmd)
-        
+
         bcmd = BrakeCmd()
         bcmd.enable = True
         bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
