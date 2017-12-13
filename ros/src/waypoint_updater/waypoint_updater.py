@@ -58,12 +58,13 @@ class WaypointUpdater(object):
             #rospy.logwarn("Publishing from Waypoints Updater:")
     
             closest_point = self.find_closest_waypoint()
-            #rospy.logwarn("CLOSEST POINT {}".format(closest_point))
+            rospy.logwarn("CLOSEST POINT {}".format(closest_point))
 
             self.final_waypoints = [] #Reinitialize each time
             for i in range(closest_point, closest_point+LOOKAHEAD_WPS):
+                if i >= self.total_waypoints:
+                    i = i - self.total_waypoints
                 waypoint=self.base_waypoints.waypoints[i]
-                #rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
                 self.final_waypoints.append(waypoint)
             #rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
             self.publish()
@@ -116,7 +117,7 @@ class WaypointUpdater(object):
                 wp_search_list = list(range(min_point,max_point))
             else:
                 wp_search_list = list(range(min_point, self.total_waypoints))
-                wp_search_list.append(list(range(0,max_point)))
+                #wp_search_list.append(list(range(0,max_point)))
 
         for i in wp_search_list:
             another_w_pos=self.base_waypoints.waypoints[i].pose.pose.position
