@@ -24,6 +24,7 @@ class TLDetector(object):
         self.camera_image = None
         self.lights = []
         self.last_closest_point = None
+        self.stop_line_waypoints = []
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -194,7 +195,7 @@ class TLDetector(object):
         light = None
         light_wp = None
 
-        if (self.pose):
+        if (self.pose and self.stop_line_waypoints):
             car_wp = self.get_closest_waypoint(self.pose.pose)
 
             # TODO find the closest visible traffic light (if one exists)

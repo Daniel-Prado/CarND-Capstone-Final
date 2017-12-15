@@ -41,12 +41,12 @@ class Controller(object):
         angular_velocity = twist_cmd.twist.angular.z
         current_vel = current_velocity.twist.linear.x
         error = linear_velocity - current_vel
-        
         # Calculate throttle using PID
         # Throttle values should be in the range 0 to 1
         elapsed_time = time.time() - self.previous_time
         self.previous_time = time.time()
         throttle = self.pid.step(error, elapsed_time)
+        #rospy.logwarn("throttle: {}".format(throttle))
         throttle = min(self.accel_limit, throttle)
         
         # Calculate brake

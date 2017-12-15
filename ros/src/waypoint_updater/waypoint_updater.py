@@ -52,10 +52,12 @@ class WaypointUpdater(object):
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         # rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
         
-        self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
+        self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=0)
         
         # TODO: Add other member variables you need below
-        rospy.spin()
+        #rospy.spin()
+        
+        self.loop()
 
     def current_velocity_cb(self, current_velocity):
         #rospy.logwarn("Update current_velocity: {}".format(current_velocity))
@@ -83,15 +85,16 @@ class WaypointUpdater(object):
             index_last = len(waypoints)
 
         i=0
-        for wp in waypoints[:index_last]:
+        for j, wp in enumerate(waypoints[:index_last]):
             dist = self.distance(wp.pose.pose.position, self.base_waypoints.waypoints[stop_wp].pose.pose.position)
             vel = decrease_rate * dist
+            if total_distance < 20.0: #Stops the car from moving at the very beginning by the traffic light
+                vel = -50
             if i % 5 == 0:
                 rospy.logwarn('distance to [%s]: %s, decel_speed: %s',
                     i, dist, vel)
             i = i+1
-            wp.twist.twist.linear.x = vel
-            #wp.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
+            self.set_waypoint_velocity(waypoints, j, vel)
         
         rospy.logwarn('final_waypoints Speed samples [5]: %s [10]: %s, [20]: %s, [30] %s, [40] %s',
             waypoints[5].twist.twist.linear.x,
@@ -102,33 +105,44 @@ class WaypointUpdater(object):
 
     def current_pose_cb(self, msg):
         self.current_pose = msg
-        if self.base_waypoints is not None:
-            #rospy.logwarn("Publishing from Waypoints Updater:")
+
+
+    def loop(self):
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown():
+            if self.current_pose is not None and self.base_waypoints is not None:
+                #rospy.logwarn("Publishing from Waypoints Updater:")
+        
+                closest_point = self.find_closest_waypoint()
+                #rospy.logwarn("CLOSEST POINT {}".format(closest_point))
     
-            closest_point = self.find_closest_waypoint()
-            #rospy.logwarn("CLOSEST POINT {}".format(closest_point))
-
-            self.final_waypoints = [] #Reinitialize each time
-            for i in range(closest_point, closest_point+LOOKAHEAD_WPS+1):
-                waypoint=self.base_waypoints.waypoints[i]
-                #rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
-                self.final_waypoints.append(waypoint)
-
-            #rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
-                            #Linear decrease speeds of the next LOOKAHEAD_WPS waypoints
-            if self.traffic_waypoint is not None \
-                and self.current_velocity is not None \
-                and self.traffic_waypoint != -1 \
-                and self.traffic_waypoint.data > closest_point:
-                    #is above conditions are met, we have a red traffic light in front of us, 
-                    #and we need to decelerate
-                    if self.current_velocity.twist.linear.x > 1.0:
-                        self.final_waypoints = self.decelerate(self.final_waypoints, self.traffic_waypoint.data, closest_point)
-            else:
-                for wp in self.final_waypoints:
-                    wp.twist.twist.linear.x = 11.11
-
-            self.publish()
+                self.final_waypoints = [] #Reinitialize each time
+                for i in range(closest_point, closest_point+LOOKAHEAD_WPS+1):
+                    waypoint=self.base_waypoints.waypoints[i]
+                    #rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
+                    self.final_waypoints.append(waypoint)
+    
+                #rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
+                                #Linear decrease speeds of the next LOOKAHEAD_WPS waypoints
+                if self.traffic_waypoint is not None \
+                    and self.current_velocity is not None \
+                    and self.traffic_waypoint != -1 \
+                    and self.traffic_waypoint.data > closest_point:
+                        #is above conditions are met, we have a red traffic light in front of us, 
+                        #and we need to decelerate
+                        if self.current_velocity.twist.linear.x > 1.0:
+                            self.final_waypoints = self.decelerate(self.final_waypoints, self.traffic_waypoint.data, closest_point)
+                else:
+                    for j, wp in enumerate(self.final_waypoints):
+                        # The param contains speed limit in kmph
+                        # Let's keep it 3 km below speed limit to prevent speed violations
+                        speed_limit = ((rospy.get_param('/waypoint_loader/velocity') - 3)
+                            * 1000.) / (60. * 60.)
+                        self.set_waypoint_velocity(self.final_waypoints, j, speed_limit)
+                        
+    
+                self.publish()
+            rate.sleep()
 
     def waypoints_cb(self, waypoints):
         self.base_waypoints = waypoints
@@ -156,6 +170,11 @@ class WaypointUpdater(object):
 
     def set_waypoint_velocity(self, waypoints, waypoint, velocity):
         waypoints[waypoint].twist.twist.linear.x = velocity
+        waypoints[waypoint].twist.twist.linear.y = 0.0
+        waypoints[waypoint].twist.twist.linear.z = 0.0
+        waypoints[waypoint].twist.twist.angular.x = 0.0
+        waypoints[waypoint].twist.twist.angular.y = 0.0
+        waypoints[waypoint].twist.twist.angular.z = 0.0
 
     def distance_between_waypoints(self, waypoints, wp1, wp2):
         dist = 0
