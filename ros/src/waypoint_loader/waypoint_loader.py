@@ -23,7 +23,17 @@ class WaypointLoader(object):
         self.pub = rospy.Publisher('/base_waypoints', Lane, queue_size=1, latch=True)
 
         self.velocity = self.kmph2mps(rospy.get_param('~velocity'))
+        
+        # Use "roslaunch launch/styx.launch" for simulator
+        # "roslaunch launch/site.launch" is used only for Carla
+        # For testing in "Test Lot" in simulator v3, 
+        # use "roslaunch launch/styx.launch" and change the 
+        # self.new_waypoint_loader to point to 'path_to_test_lot'
+        path_to_test_lot = "/home/student/alla/CarND-Capstone/ros/src/styx/../../../data/churchlot_with_cars.csv"
         self.new_waypoint_loader(rospy.get_param('~path'))
+        #self.new_waypoint_loader(path_to_test_lot)
+        rospy.logwarn(rospy.get_param('~path'))
+
         rospy.spin()
 
     def new_waypoint_loader(self, path):

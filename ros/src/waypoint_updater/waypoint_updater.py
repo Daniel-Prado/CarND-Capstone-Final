@@ -126,12 +126,13 @@ class WaypointUpdater(object):
     
                 self.final_waypoints = [] #Reinitialize each time
                 for i in range(closest_point, closest_point+LOOKAHEAD_WPS+1):
+                    if i >= self.total_waypoints:
+                        i = i - self.total_waypoints
                     waypoint=self.base_waypoints.waypoints[i]
-                    #rospy.logwarn("sample x: {}".format(waypoint.twist.twist.linear.x))
                     self.final_waypoints.append(waypoint)
     
                 #rospy.logwarn("waypoints size: {}".format(len(self.final_waypoints)))
-                                #Linear decrease speeds of the next LOOKAHEAD_WPS waypoints
+                #Linear decrease speeds of the next LOOKAHEAD_WPS waypoints
                 if self.traffic_waypoint is not None \
                     and self.current_velocity is not None \
                     and self.traffic_waypoint != -1 \
@@ -178,11 +179,6 @@ class WaypointUpdater(object):
 
     def set_waypoint_velocity(self, waypoints, waypoint, velocity):
         waypoints[waypoint].twist.twist.linear.x = velocity
-        waypoints[waypoint].twist.twist.linear.y = 0.0
-        waypoints[waypoint].twist.twist.linear.z = 0.0
-        waypoints[waypoint].twist.twist.angular.x = 0.0
-        waypoints[waypoint].twist.twist.angular.y = 0.0
-        waypoints[waypoint].twist.twist.angular.z = 0.0
 
     def distance_between_waypoints(self, waypoints, wp1, wp2):
         dist = 0
@@ -206,7 +202,7 @@ class WaypointUpdater(object):
                 wp_search_list = list(range(min_point,max_point))
             else:
                 wp_search_list = list(range(min_point, self.total_waypoints))
-                wp_search_list.append(list(range(0,max_point)))
+                wp_search_list.extend(list(range(0,max_point)))
 
         for i in wp_search_list:
             another_w_pos=self.base_waypoints.waypoints[i].pose.pose.position
