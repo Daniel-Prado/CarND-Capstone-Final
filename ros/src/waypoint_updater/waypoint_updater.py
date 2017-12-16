@@ -73,29 +73,37 @@ class WaypointUpdater(object):
             self.base_waypoints.waypoints[car_wp].pose.pose.position)
         rospy.logwarn('DECELERATE! current_speed: %s, car_wp %s, stop_wp %s, distance %s', self.current_velocity.twist.linear.x, car_wp, stop_wp, total_distance)
         decrease_rate = abs(self.current_velocity.twist.linear.x) / total_distance
-        
-        #We need to distinguish two cases:
-        # case 1) the traffic light is before the end of the final waypoints
-        if stop_relative_wp < len(waypoints):
-            index_last = stop_relative_wp
-            for wp in waypoints[index_last: ] :
-                wp.twist.twist.linear.x = .0
-        # case 2) the traffic light is before the end of the final waypoints
-        else:
-            index_last = len(waypoints)
 
-        i=0
-        for j, wp in enumerate(waypoints[:index_last]):
-            dist = self.distance(wp.pose.pose.position, self.base_waypoints.waypoints[stop_wp].pose.pose.position)
-            vel = decrease_rate * dist
-            if total_distance < 20.0: #Stops the car from moving at the very beginning by the traffic light
-                vel = -50
-            if i % 5 == 0:
-                rospy.logwarn('distance to [%s]: %s, decel_speed: %s',
-                    i, dist, vel)
-            i = i+1
-            self.set_waypoint_velocity(waypoints, j, vel)
-        
+        # If current_velocity is high and light changes when the car is at short distance to
+        # the light, decrease_rate will be high. It is safer to keep on driving to avoid 
+        # high jerk or stopping in the middle of intersection
+        if decrease_rate < 2.0:
+            #We need to distinguish two cases:
+            # case 1) the traffic light is before the end of the final waypoints
+            if stop_relative_wp < len(waypoints):
+                index_last = stop_relative_wp
+                for wp in waypoints[index_last: ] :
+                    wp.twist.twist.linear.x = .0
+            # case 2) the traffic light is before the end of the final waypoints
+            else:
+                index_last = len(waypoints)
+
+            i=0
+            for j, wp in enumerate(waypoints[:index_last]):
+                dist = self.distance(wp.pose.pose.position, self.base_waypoints.waypoints[stop_wp].pose.pose.position)
+                vel = decrease_rate * dist #Need to use some kind of spline function - high values at start; rapid drop at the end
+                # When the car is close to the stop waypoint, we can't rely on the
+                # decrease_rate*dist as the value can be too close to current speed
+                # and therefore, throttle can go up. Need to reduce speed significantly
+                if dist < 10:
+                    vel = decrease_rate * dist - (dist/2)
+                
+                if i % 5 == 0:
+                    rospy.logwarn('distance to [%s]: %s, decel_speed: %s',
+                        i, dist, vel)
+                i = i+1
+                self.set_waypoint_velocity(waypoints, j, vel)
+            
         rospy.logwarn('final_waypoints Speed samples [5]: %s [10]: %s, [20]: %s, [30] %s, [40] %s',
             waypoints[5].twist.twist.linear.x,
             waypoints[10].twist.twist.linear.x, waypoints[20].twist.twist.linear.x,
@@ -135,8 +143,8 @@ class WaypointUpdater(object):
                 else:
                     for j, wp in enumerate(self.final_waypoints):
                         # The param contains speed limit in kmph
-                        # Let's keep it 3 km below speed limit to prevent speed violations
-                        speed_limit = ((rospy.get_param('/waypoint_loader/velocity') - 3)
+                        # Let's keep it 2 km below speed limit to prevent speed violations
+                        speed_limit = ((rospy.get_param('/waypoint_loader/velocity') - 2)
                             * 1000.) / (60. * 60.)
                         self.set_waypoint_velocity(self.final_waypoints, j, speed_limit)
                         
