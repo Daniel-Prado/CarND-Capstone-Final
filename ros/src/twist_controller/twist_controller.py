@@ -26,6 +26,7 @@ class Controller(object):
         # Initialize itilities
         self.pid = PID(kp, ki, kd)
         self.low_pass_filter = LowPassFilter(tau, ts) #see if can pass real ts
+	self.steer_lpf = LowPassFilter(tau=3, ts=1)
         self.yaw_controller = YawController(wheel_base, steer_ratio, ONE_MPH, max_lat_accel, max_steer_angle)
 
         # Need time for throttle calculation?
@@ -68,5 +69,5 @@ class Controller(object):
         #Good explanation on what to pass to get_steer function in forum:
         #https://discussions.udacity.com/t/no-able-to-keep-the-lane-with-yaw-controller/433887/5
         steer = self.yaw_controller.get_steering(linear_velocity, angular_velocity, current_vel)
-        
+	steer = self.steer_lpf.filt(steer)
         return throttle, brake, steer
