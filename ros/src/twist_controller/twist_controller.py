@@ -11,7 +11,8 @@ GAS_DENSITY_KG_CUB_M = 755.00373
 ONE_MPH = 0.44704
 
 class Controller(object):
-    def __init__(self, vehicle_mass, accel_limit, decel_limit, wheel_radius, fuel_capacity,
+    def __init__(self, vehicle_mass, accel_limit, decel_limit, 
+            brake_deadband, wheel_radius, fuel_capacity,
             wheel_base, steer_ratio, max_lat_accel, max_steer_angle,
             tau, ts,
             kp, ki, kd):
@@ -20,6 +21,7 @@ class Controller(object):
         self.vehicle_mass = vehicle_mass
         self.accel_limit = accel_limit
         self.decel_limit = decel_limit
+        self.brake_deadband = brake_deadband
         self.wheel_radius = wheel_radius
         self.fuel_capacity = fuel_capacity
 
@@ -64,17 +66,17 @@ class Controller(object):
             rospy.logwarn("***current_vel: {}".format(current_vel))
             rospy.logwarn("***error: {}".format(error))
             rospy.logwarn("***elapsed_time: {}".format(elapsed_time))
-            produced_throttle = error/speed_limit
+            produced_throttle = error
             rospy.logwarn("produced_throttle: {}".format(produced_throttle))
             throttle = min(self.accel_limit, produced_throttle)
         
             # Calculate brake
             # Brake values should be in units of torque (N*m)
             #https://discussions.udacity.com/t/what-is-the-range-for-the-brake-in-the-dbw-node/412339
-            brake = (self.vehicle_mass + self.fuel_capacity * GAS_DENSITY_KG_CUB_M) * (-throttle) * self.wheel_radius
-            brake = self.low_pass_filter.filt(brake)
-            brake = max(self.decel_limit, brake)
-            rospy.logwarn("brake: {}".format(brake))
+            if throttle < 0.0:
+                brake = (self.vehicle_mass + self.fuel_capacity * GAS_DENSITY_KG_CUB_M) * fabs(throttle) * self.wheel_radius
+                brake = self.low_pass_filter.filt(brake)
+                rospy.logwarn("brake: {}".format(brake))
         
         # Calculate steer
         #Good explanation on what to pass to get_steer function in forum:

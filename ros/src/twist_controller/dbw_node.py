@@ -59,7 +59,8 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
         
         # TODO: Create `Controller` object. Add Arguments after implemented
-        self.controller = Controller(vehicle_mass, accel_limit, decel_limit, wheel_radius, fuel_capacity,
+        self.controller = Controller(vehicle_mass, accel_limit, decel_limit, 
+            brake_deadband, wheel_radius, fuel_capacity,
             wheel_base, steer_ratio, max_lat_accel, max_steer_angle,
             tau=0.5, ts=0.02, #average ts observed in Controller
             kp=0.2, ki=0.0005, kd=10.5) #using PID values from my PID project
