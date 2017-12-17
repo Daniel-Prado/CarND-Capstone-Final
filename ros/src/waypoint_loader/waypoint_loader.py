@@ -33,6 +33,7 @@ class WaypointLoader(object):
         self.new_waypoint_loader(rospy.get_param('~path'))
         #self.new_waypoint_loader(path_to_test_lot)
         rospy.logwarn(rospy.get_param('~path'))
+
         rospy.spin()
 
     def new_waypoint_loader(self, path):
