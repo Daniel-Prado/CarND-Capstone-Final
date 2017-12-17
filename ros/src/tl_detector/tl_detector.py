@@ -68,7 +68,7 @@ class TLDetector(object):
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(0.2)
+        rate = rospy.Rate(5)
         myfile = open('../../sdc-data/image-data.csv', 'a+')
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
         while not rospy.is_shutdown():
