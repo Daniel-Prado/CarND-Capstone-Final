@@ -68,7 +68,7 @@ class TLDetector(object):
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(1)
+        rate = rospy.Rate(0.2)
         myfile = open('../../sdc-data/image-data.csv', 'a+')
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
         while not rospy.is_shutdown():
@@ -77,11 +77,12 @@ class TLDetector(object):
                 continue
 
             image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-            image_name = "../../sdc-data/image%s-%s.jpg" % (str(time.time()), self.gt_image_status())
+            label = self.gt_image_status()
+            image_name = "../../sdc-data/image%s-%s.jpg" % (str(time.time()), label)
             cv2.imwrite(image_name, image)
 
-            # data = (image_name, self.gt_image_status())
-            # wr.writerow(data)
+            data = (image_name, label)
+            wr.writerow(data)
 
             rate.sleep()
 
