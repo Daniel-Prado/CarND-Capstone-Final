@@ -94,9 +94,9 @@ class WaypointUpdater(object):
                 vel = decrease_rate * dist #Need to use some kind of spline function - high values at start; rapid drop at the end
                 # When the car is close to the stop waypoint, we can't rely on the
                 # decrease_rate*dist as the value can be too close to current speed
-                # and therefore, throttle can go up. Need to reduce speed significantly
+                # and therefore, throttle can go up. Need to set velocity to 0
                 if dist < 10:
-                    vel = decrease_rate * dist - (dist/2)
+                    vel = 0
                 
                 if i % 5 == 0:
                     rospy.logwarn('distance to [%s]: %s, decel_speed: %s',
