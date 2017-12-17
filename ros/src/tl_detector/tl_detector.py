@@ -16,6 +16,7 @@ STATE_COUNT_THRESHOLD = 3
 
 
 class TLDetector(object):
+
     def __init__(self):
         rospy.init_node('tl_detector')
 
@@ -170,17 +171,14 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        # Cheating:
-        return light.state
+        if(not self.has_image):
+            self.prev_light_loc = None
+            return False
 
-        # if(not self.has_image):
-        #    self.prev_light_loc = None
-        #    return False
-
-        # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         # Get classification
-        # return self.light_classifier.get_classification(cv_image)
+        return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -189,7 +187,7 @@ class TLDetector(object):
         Returns:
             int: index of waypoint closes to the upcoming stop line for a traffic light (-1 if none exists)
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
-	    0: Red; 1: Yellow; 2: Green
+            0: Red; 1: Yellow; 2: Green
 
         """
         light = None
@@ -220,7 +218,7 @@ class TLDetector(object):
 
         if light:
             state = self.get_light_state(light)
-            #rospy.loginfo('car %s, light %s, state %s, dist %s', car_wp, light_wp, state, dist_to_stop_line)
+            # rospy.loginfo('car %s, light %s, state %s, dist %s', car_wp, light_wp, state, dist_to_stop_line)
             return light_wp, state
         # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
