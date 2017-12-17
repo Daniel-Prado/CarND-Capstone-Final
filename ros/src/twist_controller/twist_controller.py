@@ -26,7 +26,7 @@ class Controller(object):
         self.fuel_capacity = fuel_capacity
 
         # Initialize itilities
-        self.pid = PID(kp, ki, kd)
+        self.pid = PID(kp, ki, kd, self.decel_limit, self.accel_limit)
         self.low_pass_filter = LowPassFilter(tau, ts) #see if can pass real ts
         self.yaw_controller = YawController(wheel_base, steer_ratio, ONE_MPH, max_lat_accel, max_steer_angle)
 
@@ -66,9 +66,8 @@ class Controller(object):
             rospy.logwarn("***current_vel: {}".format(current_vel))
             rospy.logwarn("***error: {}".format(error))
             rospy.logwarn("***elapsed_time: {}".format(elapsed_time))
-            produced_throttle = error
-            rospy.logwarn("produced_throttle: {}".format(produced_throttle))
-            throttle = min(self.accel_limit, produced_throttle)
+            throttle = self.pid.step(error, elapsed_time)
+            rospy.logwarn("throttle: {}".format(throttle))
         
             # Calculate brake
             # Brake values should be in units of torque (N*m)
