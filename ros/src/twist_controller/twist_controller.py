@@ -67,6 +67,7 @@ class Controller(object):
             rospy.logwarn("***error: {}".format(error))
             rospy.logwarn("***elapsed_time: {}".format(elapsed_time))
             throttle = self.pid.step(error, elapsed_time)
+            throttle = min(self.accel_limit, throttle)
             rospy.logwarn("throttle: {}".format(throttle))
         
             # Calculate brake
