@@ -64,7 +64,7 @@ class Controller(object):
             rospy.logwarn("***current_vel: {}".format(current_vel))
             rospy.logwarn("***error: {}".format(error))
             rospy.logwarn("***elapsed_time: {}".format(elapsed_time))
-            produced_throttle = error# could be error/speed_limit
+            produced_throttle = error/speed_limit
             rospy.logwarn("produced_throttle: {}".format(produced_throttle))
             throttle = min(self.accel_limit, produced_throttle)
         
