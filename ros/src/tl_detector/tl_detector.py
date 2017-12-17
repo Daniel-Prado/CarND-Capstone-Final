@@ -14,6 +14,7 @@ import yaml
 import time
 import csv
 import math
+from tf.transformations import euler_from_quaternion
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -85,7 +86,7 @@ class TLDetector(object):
             rate.sleep()
 
     def gt_image_status(self):
-        # rospy.logwarn("location %s", self.pose)
+        rospy.logwarn("============================")
         can_see_light = []
         for light in self.lights:
             if self.can_i_see_this_light(light):
@@ -100,10 +101,27 @@ class TLDetector(object):
         # distance=[]
         # for light in self.lights:
         distance = pose_distance(self.pose.pose, light.pose.pose)
-        if distance > 250 or distance < 15:
-            return False
+        # print(distance)
+        # rospy.logwarn("distance %s" % distance)
         theta_light_car = pose_angle(self.pose.pose, light.pose.pose)
-        if abs(theta_light_car - self.pose.pose.orientation.z) < 0.3:
+        angle = euler_from_quaternion(
+            [
+                self.pose.pose.orientation.x,
+                self.pose.pose.orientation.y,
+                self.pose.pose.orientation.z,
+                self.pose.pose.orientation.w,
+            ]
+        )
+
+        rospy.logwarn(
+            "distance %.3f\ttheta_light_car %.4f\tcar_orientation %.4f %.4f %.4f",
+            distance,
+            theta_light_car,
+            *angle
+        )
+        if distance > 250 or distance < 20:
+            return False
+        if abs(theta_light_car - angle[-1]) < 0.3:
             return True
 
     def pose_cb(self, msg):
