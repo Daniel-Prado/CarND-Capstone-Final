@@ -8,24 +8,32 @@ import rospy
 class TLClassifier(object):
 
     def __init__(self):
-        # TODO load classifier
-        self._image_size = [800, 600]
+        rospy.logwarn("init TLClassifier")
+        self._image_size = [256, 256]
         self.sess = tf.InteractiveSession()
         self.input_tensor, self.output_tensors = self._model()
         checkpoint_dir = os.path.join(os.path.dirname(__file__), "models")
         self._restore_model(checkpoint_dir)
+        rospy.logwarn("TLClassifier initalize done")
 
     def _model(self):
-        image_input = tf.placeholder(tf.uint8, shape=self._image_size + [3])
-        image = self._preprocess_for_eval(image_input)
+        image_input = tf.placeholder(tf.uint8, shape=[None, None, 3])
+        image = self._preprocess_for_eval(image_input, *self._image_size)
         images = tf.expand_dims(image, 0)
-        logits, _ = inception_resnet_v2.inception_resnet_v2(images, num_classes=4, is_training=False)
+        arg_scope = inception_resnet_v2.inception_resnet_v2_arg_scope(weight_decay=0.0)
+        with tf.contrib.slim.arg_scope(arg_scope):
+            logits, _ = inception_resnet_v2.inception_resnet_v2(images, num_classes=4, is_training=False)
         prediction = tf.squeeze(tf.argmax(logits, 1))
         score = tf.squeeze(tf.reduce_max(logits, 1))
         return image_input, (prediction, score)
 
     def _restore_model(self, checkpoint_dir):
         save_path = tf.train.latest_checkpoint(checkpoint_dir)
+        if not save_path:
+            rospy.logfatal("no checkpoint found at position %s", checkpoint_dir)
+            raise ValueError
+        rospy.logwarn("restore classifier from %s", save_path)
+
         saver = tf.train.Saver()
         saver.restore(self.sess, save_path)
 
