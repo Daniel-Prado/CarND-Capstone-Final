@@ -3,6 +3,7 @@ import os
 import tensorflow as tf
 import inception_resnet_v2
 import rospy
+import datetime
 
 
 class TLClassifier(object):
@@ -82,7 +83,9 @@ class TLClassifier(object):
 
         """
         # TODO implement light color prediction
+        start_time = datetime.datetime.now()
         prediction, score = self.sess.run(self.output_tensors, feed_dict={self.input_tensor: image})
         prediction = prediction if prediction < 4 else 4
-        rospy.logwarn("TLClassifier prediction\t%s\tscore\t%s", prediction, score)
+        used_time = (datetime.datetime.now() - start_time).total_seconds()
+        rospy.logwarn("TLClassifier prediction\t%s\tscore\t%s, take time %.4fs", prediction, score, used_time)
         return prediction
