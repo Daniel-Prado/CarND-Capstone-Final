@@ -63,7 +63,8 @@ class DBWNode(object):
             brake_deadband, wheel_radius, fuel_capacity,
             wheel_base, steer_ratio, max_lat_accel, max_steer_angle,
             tau=0.5, ts=0.02, #average ts observed in Controller
-            kp=0.9, ki=0.0005, kd=0.15) #using PID values from my PID project
+            kp=0.5, ki=0.001, kd=0.05) #before: kp=0.9, ki=0.0005, kd=0.15
+            # these values seem to work better with stop at red.
         
         # TODO: Subscribe to all the topics you need to
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
