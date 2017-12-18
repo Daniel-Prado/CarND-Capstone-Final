@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 from functools import partial
 try:
     from .import inception_resnet_v2
@@ -229,7 +230,8 @@ def model_fn(features, labels, mode, params):
         else:
             moving_average_variables, variable_averages = None, None
 
-        learning_rate = _configure_learning_rate(global_step, FLAGS)
+        # learning_rate = _configure_learning_rate(global_step, FLAGS)
+        learning_rate = FLAGS.learning_rate
         optimizer = _configure_optimizer(learning_rate, FLAGS)
         tf.summary.scalar('learning_rate', learning_rate)
 
@@ -289,43 +291,22 @@ def _input_fn(preprocess_fn, training_dir, params):
     FLAGS = TrainFlags(**params)
 
     batch_size = FLAGS.batch_size
-    train_image_size = int(FLAGS.train_image_size or inception_resnet_v2.inception_resnet_v2.default_image_size)
+    train_image_size = [int(FLAGS.train_image_size or inception_resnet_v2.inception_resnet_v2.default_image_size)] * 2
+    # train_image_size = (600, 800)
 
-    def parse_record(record):
-        features = {
-            'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
-            'image/format': tf.FixedLenFeature((), tf.string, default_value='png'),
-            'image/height': tf.FixedLenFeature([], tf.int64),
-            'image/width': tf.FixedLenFeature([], tf.int64),
-            'image/channels': tf.FixedLenFeature([], tf.int64),
-            'image/class/label': tf.FixedLenFeature([], tf.int64),
-            'image/class/text': tf.FixedLenFeature((), tf.string, default_value=''),
-        }
-        parsed = tf.parse_single_example(record, features)
-        decoded_image = tf.image.decode_image(parsed["image/encoded"], channels=3)
-        decoded_image.set_shape([None, None, 3])
-        image = preprocess_fn(decoded_image, train_image_size, train_image_size)
-        return {"image": image}, parsed["image/class/label"]
+    def parse_record(file_name):
+        image_str = tf.read_file(file_name)
+        image = tf.image.decode_jpeg(image_str, channels=3)
+        image = preprocess_fn(image, *train_image_size)
+        label = tf.string_to_number(tf.substr(file_name, tf.size(tf.string_split([file_name], "")) - 5, 1), tf.int64)
+        label = tf.cond(label < 4, lambda: label, lambda: tf.constant(3, tf.int64))
+        return {"image": image}, label
 
-    # file_pattern = os.path.join(training_dir, "*.tfrecord")
-    if "*" in training_dir:
-        dataset = tf.data.Dataset.list_files(training_dir)
-    elif isinstance(training_dir, str):
-        training_dir = [training_dir]
-    dataset = tf.data.Dataset.from_tensor_slices(training_dir)
-
-    dataset = dataset.interleave(
-        lambda file_name: (
-            tf.data.TFRecordDataset(file_name)
-            .map(parse_record)
-            .batch(batch_size)
-            .repeat(FLAGS.max_number_of_epochs)
-        ), cycle_length=8
+    dataset = (
+        tf.data.Dataset.list_files(os.path.join(training_dir, "*.jpg"))
+        .shuffle(5000)
+        .map(parse_record, num_parallel_calls=16)
+        .batch(batch_size)
+        .repeat(FLAGS.max_number_of_epochs)
     )
-    iterator = dataset.make_one_shot_iterator()
-    features, labels = iterator.get_next()
-    return features, labels
-
-
-# def serving_input_fn(params):
-#     pass
+    return dataset.make_one_shot_iterator().get_next()

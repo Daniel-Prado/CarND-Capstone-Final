@@ -337,7 +337,7 @@ def inception_resnet_v2(inputs, num_classes=1001, is_training=True,
                 end_points['Predictions'] = tf.nn.softmax(logits, name='Predictions')
 
         return logits, end_points
-inception_resnet_v2.default_image_size = 299
+inception_resnet_v2.default_image_size = 256
 
 
 def inception_resnet_v2_arg_scope(weight_decay=0.00004,
