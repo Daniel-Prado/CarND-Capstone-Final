@@ -62,21 +62,28 @@ class Controller(object):
             # Throttle values should be in the range 0 to 1
             elapsed_time = time.time() - self.previous_time
             self.previous_time = time.time()
-            rospy.logwarn("***desired linear_velocity: {}".format(linear_velocity))
-            rospy.logwarn("***current_vel: {}".format(current_vel))
-            rospy.logwarn("***error: {}".format(error))
-            rospy.logwarn("***elapsed_time: {}".format(elapsed_time))
+            #rospy.logwarn("***desired linear_velocity: {}".format(linear_velocity))
+            #rospy.logwarn("***current_vel: {}".format(current_vel))
+            #rospy.logwarn("***error: {}".format(error))
+            #rospy.logwarn("***elapsed_time: {}".format(elapsed_time))
             throttle = self.pid.step(error, elapsed_time)
             throttle = min(self.accel_limit, throttle)
-            rospy.logwarn("throttle: {}".format(throttle))
+            #rospy.logwarn("throttle: {}".format(throttle))
         
             # Calculate brake
             # Brake values should be in units of torque (N*m)
             #https://discussions.udacity.com/t/what-is-the-range-for-the-brake-in-the-dbw-node/412339
-            if throttle < 0.0:
+            if throttle < -self.brake_deadband:
                 brake = (self.vehicle_mass + self.fuel_capacity * GAS_DENSITY_KG_CUB_M) * fabs(throttle) * self.wheel_radius
                 brake = self.low_pass_filter.filt(brake)
+                throttle = 0.0
                 rospy.logwarn("brake: {}".format(brake))
+            #See also https://carnd.slack.com/archives/C6NVDVAQ3/p1505233214000427?thread_ts=1505227052.000090&cid=C6NVDVAQ3
+            elif throttle < 0:  # deadband between -0.2 and 0.0.
+                throttle = 0.0
+                brake = 0.0
+            else: #positive throttle
+                brake = 0.0  #redundant, just to make it clear.
         
         # Calculate steer
         #Good explanation on what to pass to get_steer function in forum:
