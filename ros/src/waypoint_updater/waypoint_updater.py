@@ -7,6 +7,7 @@ from scipy.spatial import distance
 from std_msgs.msg import Int32
 from geometry_msgs.msg import TwistStamped
 
+import tf
 import math
 import numpy as np
 
@@ -121,7 +122,7 @@ class WaypointUpdater(object):
             if self.current_pose is not None and self.base_waypoints is not None:
                 #rospy.logwarn("Publishing from Waypoints Updater:")
         
-                closest_point = self.find_closest_waypoint()
+                closest_point = self.find_next_waypoint()
                 #rospy.logwarn("CLOSEST POINT {}".format(closest_point))
     
                 self.final_waypoints = [] #Reinitialize each time
@@ -188,11 +189,12 @@ class WaypointUpdater(object):
             wp1 = i
         return dist
 
-    def find_closest_waypoint(self):
+    def find_next_waypoint(self):
         # Find one waypoint closest to current position of the car
         closest_point = 0
         closest_dist_so_far = 100000 #replace with highest float
         current_w_pos = self.current_pose.pose.position
+
         if self.last_closest_point is None:
             wp_search_list = list(range(0, self.total_waypoints))
         else:
@@ -212,6 +214,18 @@ class WaypointUpdater(object):
             if(distance_between_wps<closest_dist_so_far):
                 closest_dist_so_far=distance_between_wps
                 closest_point = i
+
+        # Check if the closest point is behind or in front of us.
+        wp  = self.base_waypoints.waypoints[closest_point]
+        _,_,yaw = tf.transformations.euler_from_quaternion([self.current_pose.pose.orientation.x, self.current_pose.pose.orientation.y,
+                                                            self.current_pose.pose.orientation.z, self.current_pose.pose.orientation.w])
+        angle = math.atan2(wp.pose.pose.position.y - current_w_pos.y, wp.pose.pose.position.x - current_w_pos.x)
+        rel_angle = (angle - yaw) % (2 * math.pi)
+
+        if (rel_angle > 0.5 * math.pi) & (rel_angle < 1.5 * math.pi):
+            # The closes point was behind, so we return the next ahead
+            closest_point = (closest_point + 1) % self.total_waypoints
+
         self.last_closest_point = closest_point
         return closest_point
 
