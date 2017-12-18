@@ -117,7 +117,7 @@ class WaypointUpdater(object):
 
 
     def loop(self):
-        rate = rospy.Rate(5)
+        rate = rospy.Rate(50)
         while not rospy.is_shutdown():
             if self.current_pose is not None and self.base_waypoints is not None:
                 #rospy.logwarn("Publishing from Waypoints Updater:")
