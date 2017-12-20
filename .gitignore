@@ -1,5 +1,5 @@
 *.py[cod]
-
+sdc-grouped
 build
 devel
 ros/sdc-data
