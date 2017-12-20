@@ -12,21 +12,25 @@ class TLClassifier(object):
         rospy.logwarn("init TLClassifier")
         self._image_size = [256, 256]
         self.sess = tf.InteractiveSession()
-        self.input_tensor, self.output_tensors = self._model()
+        self.predict = self._model_callable()
         checkpoint_dir = os.path.join(os.path.dirname(__file__), "models")
         self._restore_model(checkpoint_dir)
         rospy.logwarn("TLClassifier initalize done")
 
-    def _model(self):
+    def _model_callable(self):
         image_input = tf.placeholder(tf.uint8, shape=[None, None, 3])
         image = self._preprocess_for_eval(image_input, *self._image_size)
         images = tf.expand_dims(image, 0)
         arg_scope = inception_resnet_v2.inception_resnet_v2_arg_scope(weight_decay=0.0)
         with tf.contrib.slim.arg_scope(arg_scope):
-            logits, _ = inception_resnet_v2.inception_resnet_v2(images, num_classes=4, is_training=False)
-        prediction = tf.squeeze(tf.argmax(logits, 1))
-        score = tf.squeeze(tf.reduce_max(logits, 1))
-        return image_input, (prediction, score)
+            logits, end_points = inception_resnet_v2.inception_resnet_v2(images, num_classes=3, is_training=False)
+            predictions = end_points["Predictions"]
+        prediction = tf.squeeze(tf.argmax(predictions, 1))
+        score = tf.squeeze(tf.reduce_max(predictions, 1))
+        return self.sess.make_callable(
+            fetches=(prediction, score),
+            feed_list=[image_input]
+        )
 
     def _restore_model(self, checkpoint_dir):
         save_path = tf.train.latest_checkpoint(checkpoint_dir)
@@ -84,7 +88,7 @@ class TLClassifier(object):
         """
         # TODO implement light color prediction
         start_time = datetime.datetime.now()
-        prediction, score = self.sess.run(self.output_tensors, feed_dict={self.input_tensor: image})
+        prediction, score = self.predict(image)
         prediction = prediction if prediction < 4 else 4
         used_time = (datetime.datetime.now() - start_time).total_seconds()
         rospy.logwarn("TLClassifier prediction\t%s\tscore\t%s, take time %.4fs", prediction, score, used_time)
