@@ -175,7 +175,7 @@ def _configure_learning_rate(global_step, FLAGS):  # noqa
 
 
 def model_fn(features, labels, mode, params):
-    print(params)
+    #     print(params)
     FLAGS = TrainFlags(**params)
     is_training = mode == tf.estimator.ModeKeys.TRAIN
 
@@ -184,13 +184,15 @@ def model_fn(features, labels, mode, params):
     arg_scope = inception_resnet_v2.inception_resnet_v2_arg_scope(weight_decay=0.0)
     with slim.arg_scope(arg_scope):
         logits, end_points = inception_resnet_v2.inception_resnet_v2(images, FLAGS.num_classes, is_training=is_training)
-        predicts = tf.argmax(logits, 1)
+        predicts = tf.argmax(end_points["Predictions"], 1)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
-        scores = tf.reduce_max(logits, 1)
+        scores = tf.reduce_max(end_points["Predictions"], 1)
         predictions = {
-            "predictions": predicts,
-            "scores": scores
+            "prediction": predicts,
+            "score": scores,
+            "scores": end_points["Predictions"],
+            "file_name": features["file_name"]
         }
         return tf.estimator.EstimatorSpec(
             mode=mode,
@@ -199,76 +201,82 @@ def model_fn(features, labels, mode, params):
                 "serving_default": tf.estimator.export.PredictOutput(predictions)
             }
         )
-    if is_training:
-        global_step = tf.train.get_global_step()
 
-        labels = slim.one_hot_encoding(labels, FLAGS.num_classes)
-        loss = tf.losses.softmax_cross_entropy(
-            logits=logits, onehot_labels=labels,
-            label_smoothing=FLAGS.label_smoothing, weights=1.0)
-        if 'AuxLogits' in end_points:
-            loss += tf.losses.softmax_cross_entropy(
-                logits=end_points['AuxLogits'], onehot_labels=labels,
-                label_smoothing=FLAGS.label_smoothing, weights=0.4, scope='aux_loss')
+    global_step = tf.train.get_global_step()
 
-        for end_point in end_points:
-            x = end_points[end_point]
-            tf.summary.histogram('activations/' + end_point, x)
-            tf.summary.scalar('sparsity/' + end_point, tf.nn.zero_fraction(x))
-        for loss in tf.get_collection(tf.GraphKeys.LOSSES):
-            tf.summary.scalar('losses/%s' % loss.op.name, loss)
+    onehot_labels = slim.one_hot_encoding(labels, FLAGS.num_classes)
+    loss = tf.losses.softmax_cross_entropy(
+        logits=logits, onehot_labels=onehot_labels,
+        label_smoothing=FLAGS.label_smoothing, weights=1.0)
+    if 'AuxLogits' in end_points:
+        loss += tf.losses.softmax_cross_entropy(
+            logits=end_points['AuxLogits'], onehot_labels=onehot_labels,
+            label_smoothing=FLAGS.label_smoothing, weights=0.4, scope='aux_loss')
 
-        for variable in slim.get_model_variables():
-            tf.summary.histogram(variable.op.name, variable)
+    for end_point in end_points:
+        x = end_points[end_point]
+        tf.summary.histogram('activations/' + end_point, x)
+        tf.summary.scalar('sparsity/' + end_point, tf.nn.zero_fraction(x))
+    for loss in tf.get_collection(tf.GraphKeys.LOSSES):
+        tf.summary.scalar('losses/%s' % loss.op.name, loss)
 
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    for variable in slim.get_model_variables():
+        tf.summary.histogram(variable.op.name, variable)
 
-        if FLAGS.moving_average_decay:
-            moving_average_variables = slim.get_model_variables()
-            variable_averages = tf.train.ExponentialMovingAverage(
-                FLAGS.moving_average_decay, global_step)
-        else:
-            moving_average_variables, variable_averages = None, None
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
-        # learning_rate = _configure_learning_rate(global_step, FLAGS)
-        learning_rate = FLAGS.learning_rate
-        optimizer = _configure_optimizer(learning_rate, FLAGS)
-        tf.summary.scalar('learning_rate', learning_rate)
+    if FLAGS.moving_average_decay:
+        moving_average_variables = slim.get_model_variables()
+        variable_averages = tf.train.ExponentialMovingAverage(
+            FLAGS.moving_average_decay, global_step)
+    else:
+        moving_average_variables, variable_averages = None, None
 
-        if FLAGS.sync_replicas:
-            # If sync_replicas is enabled, the averaging will be done in the chief
-            # queue runner.
-            optimizer = tf.train.SyncReplicasOptimizer(
-                opt=optimizer,
-                replicas_to_aggregate=FLAGS.replicas_to_aggregate,
-                variable_averages=variable_averages,
-                variables_to_average=moving_average_variables,
-                replica_id=tf.constant(FLAGS.task, tf.int32, shape=()),
-                total_num_replicas=FLAGS.worker_replicas)
-        elif FLAGS.moving_average_decay:
-            # Update ops executed locally by trainer.
-            update_ops.append(variable_averages.apply(moving_average_variables))
+    # learning_rate = _configure_learning_rate(global_step, FLAGS)
+    learning_rate = FLAGS.learning_rate
+    optimizer = _configure_optimizer(learning_rate, FLAGS)
+    tf.summary.scalar('learning_rate', learning_rate)
 
-        # Variables to train.
-        variables_to_train = _get_variables_to_train(FLAGS)
-        train_op = tf.contrib.layers.optimize_loss(
-            loss=loss,
-            global_step=tf.train.get_global_step(),
-            learning_rate=learning_rate,
-            optimizer=optimizer,
-            variables=variables_to_train
-        )
+    if FLAGS.sync_replicas:
+        # If sync_replicas is enabled, the averaging will be done in the chief
+        # queue runner.
+        optimizer = tf.train.SyncReplicasOptimizer(
+            opt=optimizer,
+            replicas_to_aggregate=FLAGS.replicas_to_aggregate,
+            variable_averages=variable_averages,
+            variables_to_average=moving_average_variables,
+            replica_id=tf.constant(FLAGS.task, tf.int32, shape=()),
+            total_num_replicas=FLAGS.worker_replicas)
+    elif FLAGS.moving_average_decay:
+        # Update ops executed locally by trainer.
+        update_ops.append(variable_averages.apply(moving_average_variables))
 
-        eval_metric_ops = {
-            "rmse": tf.metrics.root_mean_squared_error(labels, logits)
-        }
+    # Variables to train.
+    variables_to_train = _get_variables_to_train(FLAGS)
+    train_op = tf.contrib.layers.optimize_loss(
+        loss=loss,
+        global_step=tf.train.get_global_step(),
+        learning_rate=learning_rate,
+        optimizer=optimizer,
+        variables=variables_to_train
+    )
 
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            loss=loss,
-            train_op=train_op,
-            eval_metric_ops=eval_metric_ops
-        )
+#     rmse, rmse_update_op=tf.metrics.root_mean_squared_error(labels, logits)
+#     rmse_update_op=tf.Print(rmse_update_op,[labels, logits],summarize=999)
+#     eval_metric_ops = {
+#         "rmse": (rmse, rmse_update_op)
+#     }
+    eval_metric_ops = {
+        'eval/Accuracy': slim.metrics.streaming_accuracy(predicts, labels),
+        'eval/Precision': slim.metrics.streaming_precision(predicts, labels),
+    }
+
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        loss=loss,
+        train_op=train_op,
+        eval_metric_ops=eval_metric_ops
+    )
 
 
 def estimator_fn(run_config=None, params={}):
@@ -277,17 +285,19 @@ def estimator_fn(run_config=None, params={}):
 
 
 def train_input_fn(training_dir, params):
+    FLAGS = TrainFlags(**params)
+
     preprocess_fn = partial(preprocess_for_train, bbox=None, random_flip=True, random_resize=True)
     with tf.name_scope("train_input"):
-        return _input_fn(preprocess_fn, training_dir, params)
+        return _input_fn(preprocess_fn, training_dir, params, repeat=FLAGS.max_number_of_epochs)
 
 
 def eval_input_fn(training_dir, params):
     with tf.name_scope("eval_input"):
-        return _input_fn(preprocess_for_eval, training_dir, params)
+        return _input_fn(preprocess_for_eval, training_dir, params, repeat=1)
 
 
-def _input_fn(preprocess_fn, training_dir, params):
+def _input_fn(preprocess_fn, training_dir, params, repeat=1):
     FLAGS = TrainFlags(**params)
 
     batch_size = FLAGS.batch_size
@@ -300,13 +310,17 @@ def _input_fn(preprocess_fn, training_dir, params):
         image = preprocess_fn(image, *train_image_size)
         label = tf.string_to_number(tf.substr(file_name, tf.size(tf.string_split([file_name], "")) - 5, 1), tf.int64)
         label = tf.cond(label < 4, lambda: label, lambda: tf.constant(3, tf.int64))
-        return {"image": image}, label
+        return {"image": image, "file_name": file_name}, label
+
+    if os.path.isdir(training_dir):
+        training_dir = os.path.join(training_dir, "*.jpg")
 
     dataset = (
-        tf.data.Dataset.list_files(os.path.join(training_dir, "*.jpg"))
+        tf.data.Dataset.list_files(training_dir)
         .shuffle(5000)
+        .filter(lambda file_name: tf.string_to_number(tf.substr(file_name, tf.size(tf.string_split([file_name], "")) - 5, 1), tf.int64) < 4)
         .map(parse_record, num_parallel_calls=16)
         .batch(batch_size)
-        .repeat(FLAGS.max_number_of_epochs)
+        .repeat(repeat)
     )
     return dataset.make_one_shot_iterator().get_next()
