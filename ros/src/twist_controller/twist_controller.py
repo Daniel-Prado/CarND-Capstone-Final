@@ -28,7 +28,7 @@ class Controller(object):
         # Initialize itilities
         self.pid = PID(kp, ki, kd, self.decel_limit, self.accel_limit)
         self.low_pass_filter = LowPassFilter(tau, ts) #see if can pass real ts
-	self.steer_lpf = LowPassFilter(tau=3, ts=1)
+	self.steer_lpf = LowPassFilter(tau=0.45, ts=ts)
         self.yaw_controller = YawController(wheel_base, steer_ratio, ONE_MPH, max_lat_accel, max_steer_angle)
 
         # Need time for throttle calculation?
