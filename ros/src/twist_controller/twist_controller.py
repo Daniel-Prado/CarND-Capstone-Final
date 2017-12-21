@@ -28,6 +28,7 @@ class Controller(object):
         # Initialize itilities
         self.pid = PID(kp, ki, kd, self.decel_limit, self.accel_limit)
         self.low_pass_filter = LowPassFilter(tau, ts) #see if can pass real ts
+	self.steer_lpf = LowPassFilter(tau=0.45, ts=ts)
         self.yaw_controller = YawController(wheel_base, steer_ratio, ONE_MPH, max_lat_accel, max_steer_angle)
 
         # Need time for throttle calculation?
@@ -58,7 +59,7 @@ class Controller(object):
         if fabs(error) < 0.0001:
             error=0.0
         # Calculate throttle using PID
-        # Throttle values should be in the range 0 to 1
+        # Throttle values should be in the range -self.decel_limit (-5.0) to self.decel_limit (1.0)
         elapsed_time = time.time() - self.previous_time
         self.previous_time = time.time()
         #rospy.logwarn("***desired linear_velocity: {}".format(linear_velocity))
@@ -76,7 +77,7 @@ class Controller(object):
             brake = (self.vehicle_mass + self.fuel_capacity * GAS_DENSITY_KG_CUB_M) * fabs(throttle) * self.wheel_radius
             brake = self.low_pass_filter.filt(brake)
             throttle = 0.0
-            rospy.logwarn("brake: {}".format(brake))
+            #rospy.logwarn("brake: {}".format(brake))
         #See also https://carnd.slack.com/archives/C6NVDVAQ3/p1505233214000427?thread_ts=1505227052.000090&cid=C6NVDVAQ3
         elif throttle < 0:  # deadband between -0.2 and 0.0.
             throttle = 0.0
@@ -88,5 +89,5 @@ class Controller(object):
         #Good explanation on what to pass to get_steer function in forum:
         #https://discussions.udacity.com/t/no-able-to-keep-the-lane-with-yaw-controller/433887/5
         steer = self.yaw_controller.get_steering(linear_velocity, angular_velocity, current_vel)
-        
+	steer = self.steer_lpf.filt(steer)
         return throttle, brake, steer
