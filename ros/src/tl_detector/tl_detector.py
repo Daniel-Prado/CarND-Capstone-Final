@@ -147,7 +147,7 @@ class TLDetector(object):
                 wp_search_list = list(range(min_point, max_point))
             else:
                 wp_search_list = list(range(min_point, self.total_waypoints))
-                wp_search_list.append(list(range(0, max_point)))
+                wp_search_list.extend(list(range(0, max_point)))
 
         for i in wp_search_list:
             another_w_pos = self.waypoints.waypoints[i].pose.pose.position

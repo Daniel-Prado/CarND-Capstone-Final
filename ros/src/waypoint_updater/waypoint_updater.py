@@ -72,8 +72,9 @@ class WaypointUpdater(object):
     def decelerate(self, waypoints, stop_wp, car_wp):   
         stop_relative_wp = stop_wp-car_wp
         current_velocity = self.current_velocity.twist.linear.x
-        total_distance = self.distance(self.base_waypoints.waypoints[stop_wp].pose.pose.position,
-            self.base_waypoints.waypoints[car_wp].pose.pose.position)
+        #total_distance = self.distance(self.base_waypoints.waypoints[stop_wp].pose.pose.position,
+        #    self.base_waypoints.waypoints[car_wp].pose.pose.position)
+        total_distance = self.distance_between_waypoints(self.base_waypoints.waypoints, car_wp, stop_wp)
         rospy.logwarn('DECELERATE! current_speed: %s, car_wp %s, stop_wp %s, distance %s', current_velocity, car_wp, stop_wp, total_distance)
         decrease_rate = abs(current_velocity) / total_distance
 
@@ -114,7 +115,8 @@ class WaypointUpdater(object):
 
             i=0
             for j, wp in enumerate(waypoints[:index_last]):
-                dist = self.distance(wp.pose.pose.position, self.base_waypoints.waypoints[stop_wp].pose.pose.position)
+                #dist = self.distance(wp.pose.pose.position, self.base_waypoints.waypoints[stop_wp].pose.pose.position)
+                dist = self.distance_between_waypoints(self.base_waypoints.waypoints, car_wp+j, stop_wp)
                 if dist < 5:
                     # To avoid throttle going up and have smooth stop.
                     vel = 0.9 * (decrease_rate * dist)
@@ -125,7 +127,7 @@ class WaypointUpdater(object):
                     rospy.logwarn('distance to [%s]: %s, decel_speed: %s',
                         i, dist, vel)
                 i = i+1
-                self.set_waypoint_velocity(waypoints, j, vel)
+                wp.twist.twist.linear.x = vel
 
         # If current_velocity is high and light changes when the car is at short distance to
         # the light, decrease_rate will be high. It is safer to keep on driving to avoid 
@@ -210,9 +212,10 @@ class WaypointUpdater(object):
     def distance_between_waypoints(self, waypoints, wp1, wp2):
         dist = 0
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+        j = wp1
         for i in range(wp1, wp2+1):
-            dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
-            wp1 = i
+            dist += dl(waypoints[j].pose.pose.position, waypoints[i].pose.pose.position)
+            j = i
         return dist
 
     def find_next_waypoint(self):
