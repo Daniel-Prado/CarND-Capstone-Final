@@ -30,7 +30,7 @@ LOOKAHEAD_WPS = 40 # Number of waypoints we will publish. You can change this nu
 
 class WaypointUpdater(object):
     def __init__(self):
-        rospy.logwarn("Inside Waypoint Updater")
+        #rospy.logwarn("Inside Waypoint Updater")
         
         rospy.init_node('waypoint_updater')
         
@@ -43,6 +43,8 @@ class WaypointUpdater(object):
         self.last_closest_point = None
         self.current_velocity = None
         self.current_linear_speed = 0
+        self.last_car_to_stop_distance = 0.0
+        self.last_decrease_rate = 0.0
         
         rospy.Subscriber('/current_pose', PoseStamped, self.current_pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -75,6 +77,15 @@ class WaypointUpdater(object):
         rospy.logwarn('DECELERATE! current_speed: %s, car_wp %s, stop_wp %s, distance %s', current_velocity, car_wp, stop_wp, total_distance)
         decrease_rate = abs(current_velocity) / total_distance
 
+        # If the distance between car and stop point during last run is the same
+        # as the distance during this run, the car is close to the same waypoint.
+        # To make deceleration more efficient, we need to apply previously
+        # calculated decrease rate
+        if math.fabs(total_distance - self.last_car_to_stop_distance) < 0.0001:
+            decrease_rate = self.last_decrease_rate
+        self.last_car_to_stop_distance = total_distance
+        self.last_decrease_rate = decrease_rate
+        
         #If the car is stopped or almost stopped but we are still far away from the traffic light, we will
         #move forward at a slow speed
         if total_distance > 10 and current_velocity < 3.0:
@@ -89,9 +100,6 @@ class WaypointUpdater(object):
                 for wp in waypoints:
                     wp.twist.twist.linear.x = -5.0
 
-        # If current_velocity is high and light changes when the car is at short distance to
-        # the light, decrease_rate will be high. It is safer to keep on driving to avoid 
-        # high jerk or stopping in the middle of intersection
         elif decrease_rate < 2.0:
             rospy.logwarn('DECEL-C. Standard deceleration')
             #We need to distinguish two cases:
@@ -118,6 +126,10 @@ class WaypointUpdater(object):
                         i, dist, vel)
                 i = i+1
                 self.set_waypoint_velocity(waypoints, j, vel)
+
+        # If current_velocity is high and light changes when the car is at short distance to
+        # the light, decrease_rate will be high. It is safer to keep on driving to avoid 
+        # high jerk or stopping in the middle of intersection
         else:
             rospy.logwarn('DECEL-D. Not safe to decelerate!')
 
